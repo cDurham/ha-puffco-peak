@@ -31,39 +31,37 @@
       "charge_state": {
         "name": "Charge state",
         "state": {
-          "Bulk": "Charging",
-          "Topup": "Topping up",
-          "Full": "Full",
-          "TempStop": "Paused (temperature)",
-          "Done/Disconnected": "Done or disconnected"
+          "charging": "Charging",
+          "topping_up": "Topping up",
+          "full": "Full",
+          "paused": "Paused (temperature)",
+          "done": "Done or disconnected"
         }
       },
       "charge_source": {
         "name": "Charge source",
         "state": {
-          "USB": "USB",
-          "Generic Qi": "Wireless (Qi)",
-          "Power Dock": "Power Dock",
-          "None": "Not charging"
+          "usb": "USB",
+          "qi": "Wireless (Qi)",
+          "power_dock": "Power Dock",
+          "not_charging": "Not charging"
         }
       },
       "operating_state": {
         "name": "Operating state",
         "state": {
-          "InitMemory": "Starting up",
-          "InitVersion": "Starting up",
-          "InitBattery": "Starting up",
-          "MasterOff": "Off",
-          "Sleep": "Sleep",
-          "Idle": "Idle",
-          "TempSelect": "Selecting temperature",
-          "HeatCyclePreheat": "Preheating",
-          "HeatCycleActive": "Ready",
-          "HeatCycleFade": "Finishing",
-          "Version": "Showing version",
-          "BattLevel": "Showing battery",
-          "FactoryTest": "Factory test",
-          "Bonding": "Bonding"
+          "initializing": "Starting up",
+          "off": "Off",
+          "sleep": "Sleep",
+          "idle": "Idle",
+          "selecting_temperature": "Selecting temperature",
+          "preheating": "Preheating",
+          "ready": "Ready",
+          "finishing": "Finishing",
+          "showing_version": "Showing version",
+          "showing_battery": "Showing battery",
+          "factory_test": "Factory test",
+          "bonding": "Bonding"
         }
       }
     },

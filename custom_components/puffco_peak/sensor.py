@@ -23,17 +23,39 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import PuffcoConfigEntry, PuffcoCoordinator
 from .entity import PuffcoEntity
-from .fields import FIELDS
+
+# Device enum values mapped to Home Assistant state slugs (translated in
+# strings.json). Several device states collapse to one slug (initializing).
+OPERATING_STATE = {
+    0: "initializing",
+    1: "initializing",
+    2: "initializing",
+    3: "off",
+    4: "sleep",
+    5: "idle",
+    6: "selecting_temperature",
+    7: "preheating",
+    8: "ready",
+    9: "finishing",
+    10: "showing_version",
+    11: "showing_battery",
+    12: "factory_test",
+    13: "bonding",
+}
+CHARGE_STATE = {0: "charging", 1: "topping_up", 2: "full", 3: "paused", 4: "done"}
+CHARGE_SOURCE = {0: "usb", 1: "qi", 2: "power_dock", 3: "not_charging"}
 
 
-def _enum_options(field_name: str) -> list[str]:
-    return list(FIELDS[field_name]["enum"].values())
+def _options(mapping: dict[int, str]) -> list[str]:
+    seen: list[str] = []
+    for value in mapping.values():
+        if value not in seen:
+            seen.append(value)
+    return seen
 
 
-def _enum_label(field_name: str, value: Any) -> str | None:
-    if value is None:
-        return None
-    return FIELDS[field_name]["enum"].get(int(value))
+def _slug(mapping: dict[int, str], value: Any) -> str | None:
+    return mapping.get(int(value)) if isinstance(value, (int, float)) else None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -65,8 +87,8 @@ SENSORS: tuple[PuffcoSensorDescription, ...] = (
         key="operating_state",
         translation_key="operating_state",
         device_class=SensorDeviceClass.ENUM,
-        options=_enum_options("operatingState"),
-        value_fn=lambda d: _enum_label("operatingState", d.get("operatingState")),
+        options=_options(OPERATING_STATE),
+        value_fn=lambda d: _slug(OPERATING_STATE, d.get("operatingState")),
     ),
     PuffcoSensorDescription(
         key="battery",
@@ -81,15 +103,15 @@ SENSORS: tuple[PuffcoSensorDescription, ...] = (
         key="charge_state",
         translation_key="charge_state",
         device_class=SensorDeviceClass.ENUM,
-        options=_enum_options("battChargeState"),
-        value_fn=lambda d: _enum_label("battChargeState", d.get("battChargeState")),
+        options=_options(CHARGE_STATE),
+        value_fn=lambda d: _slug(CHARGE_STATE, d.get("battChargeState")),
     ),
     PuffcoSensorDescription(
         key="charge_source",
         translation_key="charge_source",
         device_class=SensorDeviceClass.ENUM,
-        options=_enum_options("battChargeSource"),
-        value_fn=lambda d: _enum_label("battChargeSource", d.get("battChargeSource")),
+        options=_options(CHARGE_SOURCE),
+        value_fn=lambda d: _slug(CHARGE_SOURCE, d.get("battChargeSource")),
     ),
     PuffcoSensorDescription(
         key="dabs_remaining",
