@@ -1,0 +1,150 @@
+# Example Home Assistant dashboard for the Puffco Peak integration.
+#
+# Entity IDs here assume a device named "Puffco Peak" (prefix: puffco_peak).
+# If your device has a different name, replace "puffco_peak" throughout with
+# your device's slug (for example "bedroom_puffco_peak").
+#
+# To use it: Settings > Dashboards > Add dashboard > New dashboard from scratch,
+# open it, then the three-dot menu > Edit dashboard > three-dot menu > Raw
+# configuration editor, and paste this in. Built-in cards only, no HACS frontend
+# dependencies.
+title: Puffco Peak
+views:
+  - title: Peak
+    path: peak
+    icon: mdi:cloud-outline
+    type: sections
+    max_columns: 2
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Heat
+            heading_style: title
+            icon: mdi:fire
+          - type: thermostat
+            entity: climate.puffco_peak
+            features:
+              - type: climate-preset-modes
+                style: dropdown
+          - type: horizontal-stack
+            cards:
+              - type: button
+                name: Start
+                icon: mdi:play
+                entity: button.puffco_peak_start
+                tap_action:
+                  action: perform-action
+                  perform_action: button.press
+                  target:
+                    entity_id: button.puffco_peak_start
+              - type: button
+                name: Stop
+                icon: mdi:stop
+                entity: button.puffco_peak_stop
+                tap_action:
+                  action: perform-action
+                  perform_action: button.press
+                  target:
+                    entity_id: button.puffco_peak_stop
+              - type: button
+                name: Power off
+                icon: mdi:power
+                entity: button.puffco_peak_power_off
+                tap_action:
+                  action: perform-action
+                  perform_action: button.press
+                  target:
+                    entity_id: button.puffco_peak_power_off
+          - type: horizontal-stack
+            cards:
+              - type: button
+                name: "+Temp"
+                icon: mdi:thermometer-plus
+                entity: button.puffco_peak_add_temperature
+                tap_action:
+                  action: perform-action
+                  perform_action: button.press
+                  target:
+                    entity_id: button.puffco_peak_add_temperature
+              - type: button
+                name: "+Time"
+                icon: mdi:timer-plus-outline
+                entity: button.puffco_peak_add_time
+                tap_action:
+                  action: perform-action
+                  perform_action: button.press
+                  target:
+                    entity_id: button.puffco_peak_add_time
+      - type: grid
+        cards:
+          - type: heading
+            heading: Status
+            heading_style: title
+            icon: mdi:information-outline
+          - type: tile
+            entity: sensor.puffco_peak_operating_state
+            name: State
+          - type: tile
+            entity: sensor.puffco_peak_battery
+            name: Battery
+          - type: tile
+            entity: sensor.puffco_peak_heater_temperature
+            name: Heater
+          - type: tile
+            entity: sensor.puffco_peak_dabs_remaining
+            name: Dabs left
+          - type: tile
+            entity: select.puffco_peak_heat_profile
+            name: Heat profile
+            features:
+              - type: select-options
+          - type: tile
+            entity: switch.puffco_peak_stealth_mode
+            name: Stealth
+          - type: tile
+            entity: light.puffco_peak_lantern
+            name: Lantern
+          - type: tile
+            entity: number.puffco_peak_led_brightness
+            name: Brightness
+            features:
+              - type: numeric-input
+                style: slider
+          - type: entities
+            title: Details
+            entities:
+              - entity: sensor.puffco_peak_target_temperature
+              - entity: sensor.puffco_peak_charge_state
+              - entity: sensor.puffco_peak_charge_source
+              - entity: sensor.puffco_peak_total_heat_cycles
+      - type: grid
+        cards:
+          - type: heading
+            heading: Profiles
+            heading_style: title
+            icon: mdi:cup
+          - type: entities
+            title: Profile 1
+            entities:
+              - entity: text.puffco_peak_profile_1_name
+              - entity: number.puffco_peak_profile_1_temperature
+              - entity: number.puffco_peak_profile_1_duration
+          - type: entities
+            title: Profile 2
+            entities:
+              - entity: text.puffco_peak_profile_2_name
+              - entity: number.puffco_peak_profile_2_temperature
+              - entity: number.puffco_peak_profile_2_duration
+          - type: entities
+            title: Profile 3
+            entities:
+              - entity: text.puffco_peak_profile_3_name
+              - entity: number.puffco_peak_profile_3_temperature
+              - entity: number.puffco_peak_profile_3_duration
+          - type: entities
+            title: Profile 4
+            entities:
+              - entity: text.puffco_peak_profile_4_name
+              - entity: number.puffco_peak_profile_4_temperature
+              - entity: number.puffco_peak_profile_4_duration

@@ -114,6 +114,14 @@ temperature; the device heats to a profile, it has no separate live setpoint.
 The integration polls quickly while the device is preheating or active and
 slowly the rest of the time.
 
+## Example dashboard
+
+[`examples/dashboard.yaml`](examples/dashboard.yaml) is a ready-made Lovelace
+dashboard that uses only built-in cards: a thermostat, start/stop and boost
+buttons, the profile selector, stealth, the lantern, status sensors, and
+per-profile editing. Replace the `puffco_peak` entity prefix with your device's
+slug, then paste it into a dashboard's raw configuration editor.
+
 ## Credits
 
 Protocol groundwork:
