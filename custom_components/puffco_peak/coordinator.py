@@ -9,6 +9,7 @@ from typing import Any
 
 from bleak.exc import BleakError
 from bleak_retry_connector import BleakClientWithServiceCache, establish_connection
+from habluetooth import BaseHaRemoteScanner
 
 from homeassistant.components import bluetooth
 from homeassistant.config_entries import ConfigEntry
@@ -79,6 +80,29 @@ class PuffcoCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._lorax = None
         self._device = None
 
+    def _connectable_ble_device(self):
+        """Pick a BLE device, preferring a LOCAL adapter over a proxy.
+
+        The Peak needs a bonded, encrypted link, and bonding over an ESPHome
+        Bluetooth proxy is not supported (it fails with ESP_GATT_ERROR). When a
+        local adapter can see the device, use it; only fall back to a proxy if
+        that is the only route.
+        """
+        devices = bluetooth.async_scanner_devices_by_address(
+            self.hass, self.address, connectable=True
+        )
+        if not devices:
+            return None
+        local = [d for d in devices if not isinstance(d.scanner, BaseHaRemoteScanner)]
+        chosen = (local or devices)[0]
+        _LOGGER.debug(
+            "Routing to %s via scanner %s (remote=%s)",
+            self.address,
+            getattr(chosen.scanner, "name", "?"),
+            isinstance(chosen.scanner, BaseHaRemoteScanner),
+        )
+        return chosen.ble_device
+
     async def _ensure_connected(self) -> PuffcoDevice:
         if self._device is not None and self._client is not None and self._client.is_connected:
             return self._device
@@ -91,9 +115,7 @@ class PuffcoCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             ):
                 return self._device
 
-            ble_device = bluetooth.async_ble_device_from_address(
-                self.hass, self.address, connectable=True
-            )
+            ble_device = self._connectable_ble_device()
             if ble_device is None:
                 raise UpdateFailed(
                     f"Peak {self.address} not in range of a Bluetooth adapter"
