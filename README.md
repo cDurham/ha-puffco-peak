@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="assets/logo.png" width="320"
+       alt="Badge reading HOME ASSISTANT over PUFFCO PEAK, with a Peak Pro, a Home Assistant house, a Bluetooth link and temperature controls on a circuit-board field.">
+</p>
+
 # Puffco Peak for Home Assistant
 
 A custom integration that connects Home Assistant to a **Puffco Peak Pro** over
