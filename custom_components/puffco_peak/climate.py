@@ -17,7 +17,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import ACTIVE_STATES
 from .coordinator import PuffcoConfigEntry, PuffcoCoordinator
-from .device import PuffcoDevice, TEMP_MAX_F, TEMP_MIN_F, f_to_c
+from .device import PuffcoDevice, TEMP_MAX_F, TEMP_MIN_F, c_to_f, f_to_c
 from .entity import PuffcoEntity
 
 
@@ -39,7 +39,7 @@ class PuffcoClimate(PuffcoEntity, ClimateEntity):
 
     _attr_translation_key = "peak"
     _attr_name = None  # the device's own name
-    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_native_temperature_unit = UnitOfTemperature.FAHRENHEIT
     _attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
     _attr_supported_features = (
         ClimateEntityFeature.TARGET_TEMPERATURE
@@ -47,8 +47,8 @@ class PuffcoClimate(PuffcoEntity, ClimateEntity):
         | ClimateEntityFeature.TURN_ON
         | ClimateEntityFeature.TURN_OFF
     )
-    _attr_native_min_temp = round(f_to_c(TEMP_MIN_F))
-    _attr_native_max_temp = round(f_to_c(TEMP_MAX_F))
+    _attr_native_min_temp = TEMP_MIN_F
+    _attr_native_max_temp = TEMP_MAX_F
     _attr_native_target_temperature_step = 1.0
 
     def __init__(self, coordinator: PuffcoCoordinator) -> None:
@@ -63,9 +63,13 @@ class PuffcoClimate(PuffcoEntity, ClimateEntity):
         idx = self._data.get("selectedHeatCycle")
         return idx if isinstance(idx, int) and 0 <= idx < len(self.coordinator.profiles) else None
 
+    @staticmethod
+    def _as_f(temp_c: Any) -> int | None:
+        return round(c_to_f(temp_c)) if isinstance(temp_c, (int, float)) else None
+
     @property
     def native_current_temperature(self) -> float | None:
-        return self._data.get("userHeaterTemp")
+        return self._as_f(self._data.get("userHeaterTemp"))
 
     @property
     def native_target_temperature(self) -> float | None:
@@ -73,8 +77,8 @@ class PuffcoClimate(PuffcoEntity, ClimateEntity):
         if idx is not None:
             temp = self.coordinator.profiles[idx].get("temp_c")
             if temp is not None:
-                return temp
-        return self._data.get("userHeaterTempCommand")
+                return self._as_f(temp)
+        return self._as_f(self._data.get("userHeaterTempCommand"))
 
     @property
     def hvac_mode(self) -> HVACMode:
@@ -131,13 +135,11 @@ class PuffcoClimate(PuffcoEntity, ClimateEntity):
                 "Select a heat profile first; the target temperature edits the "
                 "selected profile."
             )
-        value = max(
-            self._attr_native_min_temp,
-            min(self._attr_native_max_temp, float(temperature)),
-        )
+        value_f = max(TEMP_MIN_F, min(TEMP_MAX_F, float(temperature)))
+        value_c = f_to_c(value_f)
 
         async def _write(device: PuffcoDevice) -> None:
-            await device.write(f"heatCycle{idx}Temp", value)
+            await device.write(f"heatCycle{idx}Temp", value_c)
 
         await self.coordinator.async_command(_write)
         await self.coordinator.async_reload_profiles()

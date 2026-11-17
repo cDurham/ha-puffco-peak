@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -20,13 +21,12 @@ from .device import (
     PuffcoDevice,
     TEMP_MAX_F,
     TEMP_MIN_F,
+    c_to_f,
     f_to_c,
 )
 from .entity import PuffcoEntity
 from .fields import FIELDS
 
-_MIN_C = round(f_to_c(TEMP_MIN_F))
-_MAX_C = round(f_to_c(TEMP_MAX_F))
 # LED brightness is 38.25..255 on the wire; expose it as a friendly percentage.
 _BRIGHTNESS_PCT_MIN = round(BRIGHTNESS_MIN / BRIGHTNESS_MAX * 100)
 
@@ -44,6 +44,9 @@ class ProfileNumberSpec:
     unit: str | None = None
     device_class: NumberDeviceClass | None = None
     enabled_default: bool = True
+    # device value -> displayed value (defaults to rounding), and the inverse.
+    decode: Callable[[float], float] | None = None
+    encode: Callable[[float], float] | None = None
 
 
 PROFILE_NUMBERS: tuple[ProfileNumberSpec, ...] = (
@@ -51,11 +54,13 @@ PROFILE_NUMBERS: tuple[ProfileNumberSpec, ...] = (
         suffix="Temp",
         key="temp_c",
         label="temperature",
-        native_min_value=_MIN_C,
-        native_max_value=_MAX_C,
+        native_min_value=TEMP_MIN_F,
+        native_max_value=TEMP_MAX_F,
         native_step=1,
-        unit=UnitOfTemperature.CELSIUS,
+        unit=UnitOfTemperature.FAHRENHEIT,
         device_class=NumberDeviceClass.TEMPERATURE,
+        decode=lambda c: round(c_to_f(c)),
+        encode=f_to_c,
     ),
     ProfileNumberSpec(
         suffix="Time",
@@ -76,6 +81,7 @@ PROFILE_NUMBERS: tuple[ProfileNumberSpec, ...] = (
         native_step=0.5,
         unit=UnitOfTemperature.CELSIUS,
         enabled_default=False,
+        decode=lambda c: round(c, 1),
     ),
     ProfileNumberSpec(
         suffix="BoostTimeDelta",
@@ -129,11 +135,16 @@ class PuffcoProfileNumber(PuffcoEntity, NumberEntity):
 
     @property
     def native_value(self) -> float | None:
-        if self._index < len(self.coordinator.profiles):
-            return self.coordinator.profiles[self._index].get(self._spec.key)
-        return None
+        if self._index >= len(self.coordinator.profiles):
+            return None
+        raw = self.coordinator.profiles[self._index].get(self._spec.key)
+        if raw is None:
+            return None
+        return self._spec.decode(raw) if self._spec.decode else round(raw)
 
     async def async_set_native_value(self, value: float) -> None:
+        if self._spec.encode:
+            value = self._spec.encode(value)
         field = f"heatCycle{self._index}{self._spec.suffix}"
         await self.coordinator.async_command(lambda d: d.write(field, value))
         await self.coordinator.async_reload_profiles()
