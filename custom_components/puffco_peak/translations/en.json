@@ -1,0 +1,90 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "bluetooth_confirm": {
+        "title": "Set up Puffco Peak",
+        "description": "Add {name}?\n\nThe first time Home Assistant connects, put the Peak in pairing mode (hold the button until the logo glows blue) so it can bond with the Home Assistant host's Bluetooth adapter."
+      },
+      "user": {
+        "title": "Set up Puffco Peak",
+        "description": "Pick your Peak. Put it in pairing mode (hold the button until the logo glows blue) before setup so it can bond with the Home Assistant host.",
+        "data": {
+          "address": "Device"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This Peak is already set up.",
+      "no_devices_found": "No Puffco device found nearby. Wake the Peak, put it in pairing mode, and make sure it is in range of the Home Assistant host's Bluetooth adapter."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "current_temperature": { "name": "Heater temperature" },
+      "target_temperature": { "name": "Target temperature" },
+      "battery": { "name": "Battery" },
+      "battery_voltage": { "name": "Battery voltage" },
+      "battery_temperature": { "name": "Battery temperature" },
+      "dabs_remaining": { "name": "Dabs remaining" },
+      "total_heat_cycles": { "name": "Total heat cycles" },
+      "charge_state": {
+        "name": "Charge state",
+        "state": {
+          "Bulk": "Charging",
+          "Topup": "Topping up",
+          "Full": "Full",
+          "TempStop": "Paused (temperature)",
+          "Done/Disconnected": "Done or disconnected"
+        }
+      },
+      "charge_source": {
+        "name": "Charge source",
+        "state": {
+          "USB": "USB",
+          "Generic Qi": "Wireless (Qi)",
+          "Power Dock": "Power Dock",
+          "None": "Not charging"
+        }
+      },
+      "operating_state": {
+        "name": "Operating state",
+        "state": {
+          "InitMemory": "Starting up",
+          "InitVersion": "Starting up",
+          "InitBattery": "Starting up",
+          "MasterOff": "Off",
+          "Sleep": "Sleep",
+          "Idle": "Idle",
+          "TempSelect": "Selecting temperature",
+          "HeatCyclePreheat": "Preheating",
+          "HeatCycleActive": "Ready",
+          "HeatCycleFade": "Finishing",
+          "Version": "Showing version",
+          "BattLevel": "Showing battery",
+          "FactoryTest": "Factory test",
+          "Bonding": "Bonding"
+        }
+      }
+    },
+    "button": {
+      "start": { "name": "Start" },
+      "stop": { "name": "Stop" },
+      "add_temperature": { "name": "Add temperature" },
+      "add_time": { "name": "Add time" },
+      "power_off": { "name": "Power off" }
+    },
+    "select": {
+      "profile": { "name": "Heat profile" }
+    },
+    "switch": {
+      "stealth": { "name": "Stealth mode" }
+    },
+    "light": {
+      "lantern": { "name": "Lantern" }
+    },
+    "number": {
+      "brightness": { "name": "LED brightness" }
+    }
+  }
+}

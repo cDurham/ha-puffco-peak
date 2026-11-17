@@ -1,0 +1,229 @@
+"""Connection + polling coordinator for a Puffco Peak Pro."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from collections.abc import Awaitable, Callable
+from typing import Any
+
+from bleak.exc import BleakError
+from bleak_retry_connector import BleakClientWithServiceCache, establish_connection
+
+from homeassistant.components import bluetooth
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+
+from .const import (
+    ACTIVE_STATES,
+    DOMAIN,
+    INFO_FIELDS,
+    POLL_ACTIVE,
+    POLL_FIELDS,
+    POLL_IDLE,
+    PROFILE_COUNT,
+)
+from .device import PuffcoDevice
+from .lorax import LoraxClient, read_bond_characteristic
+
+_LOGGER = logging.getLogger(__name__)
+
+type PuffcoConfigEntry = ConfigEntry[PuffcoCoordinator]
+
+# How many times to re-read the encrypted characteristic while waiting for the
+# OS bond to complete before giving up with a "put it in pairing mode" message.
+_BOND_READ_ATTEMPTS = 6
+_BOND_READ_DELAY = 1.0
+
+
+class PuffcoNotBondedError(UpdateFailed):
+    """The link is up but not bonded/encrypted, so LORAX will not answer."""
+
+
+class PuffcoCoordinator(DataUpdateCoordinator[dict[str, Any]]):
+    """Holds one authenticated LORAX session and polls device state."""
+
+    def __init__(
+        self, hass: HomeAssistant, entry: PuffcoConfigEntry, address: str
+    ) -> None:
+        super().__init__(
+            hass,
+            _LOGGER,
+            name=f"{DOMAIN} {address}",
+            update_interval=POLL_IDLE,
+            config_entry=entry,
+        )
+        self.address = address
+        self.device_info: dict[str, Any] = {}
+        self.profiles: list[dict[str, Any]] = []
+        self._client: BleakClientWithServiceCache | None = None
+        self._lorax: LoraxClient | None = None
+        self._device: PuffcoDevice | None = None
+        self._connect_lock = asyncio.Lock()
+
+    @property
+    def puffco(self) -> PuffcoDevice:
+        """The device API for entity commands (raises if not connected)."""
+        if self._device is None:
+            raise UpdateFailed("Not connected to the Peak")
+        return self._device
+
+    # -- connection ---------------------------------------------------------
+    @callback
+    def _on_disconnect(self, _client: BleakClientWithServiceCache) -> None:
+        _LOGGER.debug("%s disconnected", self.address)
+        if self._lorax is not None:
+            self._lorax.fail_pending(BleakError("disconnected"))
+        self._client = None
+        self._lorax = None
+        self._device = None
+
+    async def _ensure_connected(self) -> PuffcoDevice:
+        if self._device is not None and self._client is not None and self._client.is_connected:
+            return self._device
+
+        async with self._connect_lock:
+            if (
+                self._device is not None
+                and self._client is not None
+                and self._client.is_connected
+            ):
+                return self._device
+
+            ble_device = bluetooth.async_ble_device_from_address(
+                self.hass, self.address, connectable=True
+            )
+            if ble_device is None:
+                raise UpdateFailed(
+                    f"Peak {self.address} not in range of a Bluetooth adapter"
+                )
+
+            _LOGGER.debug("Connecting to %s", self.address)
+            client = await establish_connection(
+                BleakClientWithServiceCache,
+                ble_device,
+                self.address,
+                disconnected_callback=self._on_disconnect,
+            )
+
+            await self._bond(client)
+
+            lorax = LoraxClient(client)
+            await lorax.start()
+            try:
+                await lorax.auth()
+            except Exception as err:
+                await self._disconnect_client(client)
+                raise PuffcoNotBondedError(
+                    "The Peak did not answer the unlock handshake. Put it in "
+                    "pairing mode (hold the button until the logo glows blue) "
+                    "and try again."
+                ) from err
+
+            device = PuffcoDevice(lorax)
+            self._client = client
+            self._lorax = lorax
+            self._device = device
+
+            if not self.device_info:
+                await self._load_device_info(device)
+            if not self.profiles:
+                await self._load_profiles(device)
+            return device
+
+    async def _bond(self, client: BleakClientWithServiceCache) -> None:
+        """Make the OS bond with the Peak, then confirm the link is encrypted."""
+        try:
+            await client.pair()
+        except NotImplementedError:
+            _LOGGER.debug("pair() not implemented on this backend; relying on read")
+        except BleakError as err:
+            # AlreadyExists / in-progress are fine; the read below is the truth.
+            _LOGGER.debug("pair() reported: %s", err)
+
+        last_err: Exception | None = None
+        for attempt in range(1, _BOND_READ_ATTEMPTS + 1):
+            try:
+                value = await read_bond_characteristic(client)
+                _LOGGER.debug("Bond confirmed (OTA app version %s)", value.hex())
+                return
+            except BleakError as err:
+                last_err = err
+                _LOGGER.debug("Bond read %d/%d: %s", attempt, _BOND_READ_ATTEMPTS, err)
+                await asyncio.sleep(_BOND_READ_DELAY)
+
+        await self._disconnect_client(client)
+        raise PuffcoNotBondedError(
+            "Could not establish an encrypted (bonded) link. Put the Peak in "
+            "pairing mode and make sure it is paired with the Home Assistant "
+            f"host's Bluetooth adapter. Last error: {last_err}"
+        )
+
+    async def _disconnect_client(self, client: BleakClientWithServiceCache) -> None:
+        try:
+            await client.disconnect()
+        except BleakError as err:
+            _LOGGER.debug("Error during disconnect: %s", err)
+
+    async def _load_device_info(self, device: PuffcoDevice) -> None:
+        info: dict[str, Any] = {}
+        for name in INFO_FIELDS:
+            info[name] = await device.try_read(name)
+        self.device_info = info
+        _LOGGER.debug("Device info: %s", info)
+
+    async def _load_profiles(self, device: PuffcoDevice) -> None:
+        """Read the four heat profiles (name, temp, time, boosts) for editing."""
+        profiles: list[dict[str, Any]] = []
+        for i in range(PROFILE_COUNT):
+            name = await device.try_read(f"heatCycle{i}Name")
+            profiles.append(
+                {
+                    "index": i,
+                    "name": name or f"Profile {i + 1}",
+                    "temp_c": await device.try_read(f"heatCycle{i}Temp"),
+                    "time_s": await device.try_read(f"heatCycle{i}Time"),
+                    "boost_temp_c": await device.try_read(f"heatCycle{i}BoostTempDelta"),
+                    "boost_time_s": await device.try_read(f"heatCycle{i}BoostTimeDelta"),
+                }
+            )
+        self.profiles = profiles
+        _LOGGER.debug("Profiles: %s", profiles)
+
+    async def async_reload_profiles(self) -> None:
+        """Re-read profiles after an edit and notify entities."""
+        if self._device is not None:
+            await self._load_profiles(self._device)
+            self.async_update_listeners()
+
+    async def async_command(
+        self, action: Callable[[PuffcoDevice], Awaitable[None]]
+    ) -> None:
+        """Run a device command, making sure we are connected, then refresh."""
+        device = await self._ensure_connected()
+        await action(device)
+        await self.async_request_refresh()
+
+    # -- polling ------------------------------------------------------------
+    async def _async_update_data(self) -> dict[str, Any]:
+        device = await self._ensure_connected()
+        data: dict[str, Any] = {}
+        for name in POLL_FIELDS:
+            if device.has(name):
+                data[name] = await device.try_read(name)
+
+        state = data.get("operatingState")
+        interval = POLL_ACTIVE if state in ACTIVE_STATES else POLL_IDLE
+        if self.update_interval != interval:
+            self.update_interval = interval
+
+        return data
+
+    async def async_shutdown(self) -> None:
+        await super().async_shutdown()
+        if self._client is not None:
+            await self._disconnect_client(self._client)
+        self._client = None
+        self._lorax = None
+        self._device = None
