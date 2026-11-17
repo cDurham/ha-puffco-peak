@@ -94,12 +94,21 @@ class PuffcoCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not devices:
             return None
         local = [d for d in devices if not isinstance(d.scanner, BaseHaRemoteScanner)]
-        chosen = (local or devices)[0]
+        if not local:
+            # Only a proxy can see it. Bonding does not work over a proxy, and a
+            # proxy connect just hangs, so refuse rather than fall back to one.
+            _LOGGER.debug(
+                "%s is only reachable via a Bluetooth proxy (%d remote scanner(s)); "
+                "a local adapter in range is required for bonding",
+                self.address,
+                len(devices),
+            )
+            return None
+        chosen = local[0]
         _LOGGER.debug(
-            "Routing to %s via scanner %s (remote=%s)",
+            "Routing to %s via local scanner %s",
             self.address,
             getattr(chosen.scanner, "name", "?"),
-            isinstance(chosen.scanner, BaseHaRemoteScanner),
         )
         return chosen.ble_device
 
@@ -118,7 +127,8 @@ class PuffcoCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             ble_device = self._connectable_ble_device()
             if ble_device is None:
                 raise UpdateFailed(
-                    f"Peak {self.address} not in range of a Bluetooth adapter"
+                    f"Peak {self.address} is not in range of a local Bluetooth "
+                    "adapter (bonding is not possible over a Bluetooth proxy)"
                 )
 
             _LOGGER.debug("Connecting to %s", self.address)
