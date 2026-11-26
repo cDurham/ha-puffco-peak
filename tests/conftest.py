@@ -10,7 +10,17 @@ class UpdateFailed(Exception):
 
 
 class DataUpdateCoordinator[T]:
-    pass
+    def __init__(self, hass, logger, *, name, update_interval, config_entry, always_update=True):
+        self.update_interval = update_interval
+        self.data = None
+        self.published = []
+
+    def async_set_updated_data(self, data):
+        self.data = data
+        self.published.append(data)
+
+    async def async_request_refresh(self):
+        self.data = await self._async_update_data()
 
 
 class FakeBus:
