@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
+from functools import partial
+from time import monotonic
 from typing import Any
 
 from bleak.exc import BleakError
@@ -25,10 +27,11 @@ from .const import (
     POLL_FIELDS,
     POLL_IDLE,
     PROFILE_COUNT,
+    PUSHED_FIELD_PERIODS,
 )
 from .bluez_agent import pairing_agent
 from .device import PuffcoDevice
-from .lorax import LoraxClient, read_bond_characteristic
+from .lorax import TRANSACT_ERRORS, LoraxClient, read_bond_characteristic
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,6 +44,7 @@ _BOND_READ_DELAY = 1.0
 # How long to wait for BlueZ to answer Pair(). Longer than its own 30 s pairing
 # timeout, so its error normally comes first; this only catches a missing reply.
 _PAIR_TIMEOUT = 40.0
+_STATE = "operatingState"
 
 
 class PuffcoNotBondedError(UpdateFailed):
@@ -59,6 +63,7 @@ class PuffcoCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             name=f"{DOMAIN} {address}",
             update_interval=POLL_IDLE,
             config_entry=entry,
+            always_update=False,
         )
         self.address = address
         self.device_info: dict[str, Any] = {}
@@ -67,6 +72,7 @@ class PuffcoCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._lorax: LoraxClient | None = None
         self._device: PuffcoDevice | None = None
         self._connect_lock = asyncio.Lock()
+        self._full_read_at = 0.0
 
     @property
     def puffco(self) -> PuffcoDevice:
@@ -167,7 +173,31 @@ class PuffcoCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 await self._load_device_info(device)
             if not self.profiles:
                 await self._load_profiles(device)
+            await self._watch_pushed_fields(device)
             return device
+
+    async def _watch_pushed_fields(self, device: PuffcoDevice) -> None:
+        for name, period in PUSHED_FIELD_PERIODS.items():
+            if not device.has(name):
+                continue
+            try:
+                await device.watch(name, period, partial(self._on_push, name))
+            except TRANSACT_ERRORS as err:
+                _LOGGER.debug("No push for %s, polling for it instead: %s", name, err)
+
+    def _state_is_pushed(self) -> bool:
+        return self._device is not None and self._device.watching(_STATE)
+
+    def _full_read_is_due(self) -> bool:
+        return monotonic() - self._full_read_at >= POLL_IDLE.total_seconds()
+
+    @callback
+    def _on_push(self, name: str, value: Any) -> None:
+        if not self.data or value == self.data.get(name):
+            return
+        self._full_read_at = 0.0
+        self.update_interval = POLL_ACTIVE
+        self.async_set_updated_data({**self.data, name: value})
 
     async def _bond(self, client: BleakClientWithServiceCache) -> None:
         """Make the OS bond with the Peak, then confirm the link is encrypted."""
@@ -263,21 +293,43 @@ class PuffcoCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Run a device command, making sure we are connected, then refresh."""
         device = await self._ensure_connected()
         await action(device)
+        self._full_read_at = 0.0
         await self.async_request_refresh()
 
     # -- polling ------------------------------------------------------------
     async def _async_update_data(self) -> dict[str, Any]:
+        try:
+            data = await self._poll()
+        except Exception:
+            self.update_interval = POLL_IDLE
+            raise
+        settled = (
+            data.get(_STATE) not in ACTIVE_STATES
+            and self._state_is_pushed()
+            and not self._full_read_is_due()
+        )
+        self.update_interval = POLL_IDLE if settled else POLL_ACTIVE
+        return data
+
+    async def _poll(self) -> dict[str, Any]:
         device = await self._ensure_connected()
-        data: dict[str, Any] = {}
+        pushed = device.pushed()
+        state = pushed[_STATE] if _STATE in pushed else await device.try_read(_STATE)
+        if (
+            _STATE not in pushed
+            and self.data
+            and state not in ACTIVE_STATES
+            and state == self.data.get(_STATE)
+            and not self._full_read_is_due()
+        ):
+            return self.data
+
+        self._full_read_at = monotonic()
+        data: dict[str, Any] = {_STATE: state, **pushed}
         for name in POLL_FIELDS:
-            if device.has(name):
+            if name not in data and device.has(name):
                 data[name] = await device.try_read(name)
-
-        state = data.get("operatingState")
-        interval = POLL_ACTIVE if state in ACTIVE_STATES else POLL_IDLE
-        if self.update_interval != interval:
-            self.update_interval = interval
-
+        data.update(device.pushed())
         return data
 
     async def async_shutdown(self) -> None:
