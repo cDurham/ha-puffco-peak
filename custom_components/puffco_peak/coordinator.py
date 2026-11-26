@@ -16,6 +16,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .agent import pairing_agent
 from .const import (
     ACTIVE_STATES,
     DOMAIN,
@@ -36,6 +37,8 @@ type PuffcoConfigEntry = ConfigEntry[PuffcoCoordinator]
 # OS bond to complete before giving up with a "put it in pairing mode" message.
 _BOND_READ_ATTEMPTS = 6
 _BOND_READ_DELAY = 1.0
+_BOND_READ_TIMEOUT = 30.0  # BlueZ's own ATT and SMP timeout
+_PAIR_TIMEOUT = 40.0  # past BlueZ's own, so its error wins
 
 
 class PuffcoNotBondedError(UpdateFailed):
@@ -137,6 +140,7 @@ class PuffcoCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 ble_device,
                 self.address,
                 disconnected_callback=self._on_disconnect,
+                use_services_cache=False,  # a table cached before bonding can be incomplete
             )
 
             await self._bond(client)
@@ -166,30 +170,45 @@ class PuffcoCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _bond(self, client: BleakClientWithServiceCache) -> None:
         """Make the OS bond with the Peak, then confirm the link is encrypted."""
-        try:
-            await client.pair()
-        except NotImplementedError:
-            _LOGGER.debug("pair() not implemented on this backend; relying on read")
-        except BleakError as err:
-            # AlreadyExists / in-progress are fine; the read below is the truth.
-            _LOGGER.debug("pair() reported: %s", err)
-
+        pair_err: Exception | None = None
         last_err: Exception | None = None
-        for attempt in range(1, _BOND_READ_ATTEMPTS + 1):
+        async with pairing_agent():  # the bond read can start pairing too
             try:
-                value = await read_bond_characteristic(client)
-                _LOGGER.debug("Bond confirmed (OTA app version %s)", value.hex())
-                return
+                async with asyncio.timeout(_PAIR_TIMEOUT):  # BlueZ can withhold the Pair reply
+                    await client.pair()
+            except NotImplementedError:
+                _LOGGER.debug("pair() not implemented on this backend; relying on read")
+            except TimeoutError:
+                pair_err = TimeoutError(f"no Pair reply within {_PAIR_TIMEOUT:.0f}s")
+                _LOGGER.debug("pair() reported: %s", pair_err)
             except BleakError as err:
-                last_err = err
-                _LOGGER.debug("Bond read %d/%d: %s", attempt, _BOND_READ_ATTEMPTS, err)
-                await asyncio.sleep(_BOND_READ_DELAY)
+                # AlreadyExists / in-progress are fine; the read below is the truth.
+                pair_err = err
+                _LOGGER.debug("pair() reported: %s", err)
+
+            for attempt in range(1, _BOND_READ_ATTEMPTS + 1):
+                if not client.is_connected:  # a refused pairing drops the link
+                    break
+                try:
+                    async with asyncio.timeout(_BOND_READ_TIMEOUT):  # a stale bond can stall the read
+                        value = await read_bond_characteristic(client)
+                    _LOGGER.debug("Bond confirmed (OTA app version %s)", value.hex())
+                    return
+                except TimeoutError:
+                    last_err = TimeoutError(f"no reply within {_BOND_READ_TIMEOUT:.0f}s")
+                    break
+                except BleakError as err:
+                    last_err = err
+                    _LOGGER.debug("Bond read %d/%d: %s", attempt, _BOND_READ_ATTEMPTS, err)
+                    await asyncio.sleep(_BOND_READ_DELAY)
 
         await self._disconnect_client(client)
         raise PuffcoNotBondedError(
             "Could not establish an encrypted (bonded) link. Put the Peak in "
             "pairing mode and make sure it is paired with the Home Assistant "
-            f"host's Bluetooth adapter. Last error: {last_err}"
+            "host's Bluetooth adapter; if it was paired before, remove that "
+            f"pairing first. Pairing: {pair_err or 'no error'}; "
+            f"last read: {last_err or 'link dropped'}"
         )
 
     async def _disconnect_client(self, client: BleakClientWithServiceCache) -> None:

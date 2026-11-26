@@ -64,13 +64,14 @@ directory and restart.
 
 ### If bonding does not complete
 
-Most adapters bond automatically on the first connect. If yours does not, pair
-the device once from the Home Assistant host shell, then set the integration up
-again:
+The integration bonds automatically on the first connect. If it does not, pair
+the device once with `bluetoothctl` (on Home Assistant OS, from the Terminal &
+SSH add-on), then set the integration up again:
 
 ```bash
 bluetoothctl
 power on
+remove AA:BB:CC:DD:EE:FF   # only if it was paired before
 scan on          # wait for the Peak to appear, note its MAC
 pair AA:BB:CC:DD:EE:FF
 trust AA:BB:CC:DD:EE:FF
