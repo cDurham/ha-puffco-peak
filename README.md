@@ -64,13 +64,15 @@ directory and restart.
 
 ### If bonding does not complete
 
-Most adapters bond automatically on the first connect. If yours does not, pair
-the device once from the Home Assistant host shell, then set the integration up
-again:
+The integration bonds by itself on the first connect, Home Assistant OS
+included. BlueZ won't pair without a pairing agent, so while bonding the
+integration registers a temporary one. If bonding still fails, pair the device
+once from the Home Assistant host shell, then set the integration up again:
 
 ```bash
 bluetoothctl
 power on
+remove AA:BB:CC:DD:EE:FF   # only if it was paired before
 scan on          # wait for the Peak to appear, note its MAC
 pair AA:BB:CC:DD:EE:FF
 trust AA:BB:CC:DD:EE:FF

@@ -26,6 +26,7 @@ from .const import (
     POLL_IDLE,
     PROFILE_COUNT,
 )
+from .bluez_agent import pairing_agent
 from .device import PuffcoDevice
 from .lorax import LoraxClient, read_bond_characteristic
 
@@ -37,6 +38,9 @@ type PuffcoConfigEntry = ConfigEntry[PuffcoCoordinator]
 # OS bond to complete before giving up with a "put it in pairing mode" message.
 _BOND_READ_ATTEMPTS = 6
 _BOND_READ_DELAY = 1.0
+# How long to wait for BlueZ to answer Pair(). Longer than its own 30 s pairing
+# timeout, so its error normally comes first; this only catches a missing reply.
+_PAIR_TIMEOUT = 40.0
 
 
 class PuffcoNotBondedError(UpdateFailed):
@@ -167,24 +171,31 @@ class PuffcoCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _bond(self, client: BleakClientWithServiceCache) -> None:
         """Make the OS bond with the Peak, then confirm the link is encrypted."""
-        try:
-            await client.pair()
-        except NotImplementedError:
-            _LOGGER.debug("pair() not implemented on this backend; relying on read")
-        except BleakError as err:
-            # AlreadyExists / in-progress are fine; the read below is the truth.
-            _LOGGER.debug("pair() reported: %s", err)
-
         last_err: Exception | None = None
-        for attempt in range(1, _BOND_READ_ATTEMPTS + 1):
+        # BlueZ won't pair without an agent, and Home Assistant OS has none.
+        # Keep one through the reads too: a pairing that pair() started can
+        # still be finishing when they begin.
+        async with pairing_agent():
             try:
-                value = await read_bond_characteristic(client)
-                _LOGGER.debug("Bond confirmed (OTA app version %s)", value.hex())
-                return
+                async with asyncio.timeout(_PAIR_TIMEOUT):
+                    await client.pair()
+            except NotImplementedError:
+                _LOGGER.debug("pair() not implemented on this backend; relying on read")
+            except TimeoutError:
+                _LOGGER.debug("pair() got no reply within %.0f s", _PAIR_TIMEOUT)
             except BleakError as err:
-                last_err = err
-                _LOGGER.debug("Bond read %d/%d: %s", attempt, _BOND_READ_ATTEMPTS, err)
-                await asyncio.sleep(_BOND_READ_DELAY)
+                # AlreadyExists / in-progress are fine; the read below is the truth.
+                _LOGGER.debug("pair() reported: %s", err)
+
+            for attempt in range(1, _BOND_READ_ATTEMPTS + 1):
+                try:
+                    value = await read_bond_characteristic(client)
+                    _LOGGER.debug("Bond confirmed (OTA app version %s)", value.hex())
+                    return
+                except BleakError as err:
+                    last_err = err
+                    _LOGGER.debug("Bond read %d/%d: %s", attempt, _BOND_READ_ATTEMPTS, err)
+                    await asyncio.sleep(_BOND_READ_DELAY)
 
         await self._disconnect_client(client)
         raise PuffcoNotBondedError(
