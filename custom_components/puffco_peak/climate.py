@@ -12,7 +12,7 @@ from homeassistant.components.climate import (
 )
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import ACTIVE_STATES
@@ -103,9 +103,8 @@ class PuffcoClimate(PuffcoEntity, ClimateEntity):
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         if hvac_mode == HVACMode.HEAT:
-            idx = self._data.get("selectedHeatCycle")
-            start = idx if isinstance(idx, int) and 0 <= idx <= 3 else 0
-            await self.coordinator.async_command(lambda d: d.start_heat_cycle(start))
+            index = self.coordinator.selected_profile()
+            await self.coordinator.async_command(lambda d: d.start_heat_cycle(index))
         else:
             await self.coordinator.async_command(lambda d: d.stop_heat_cycle())
 
@@ -131,7 +130,7 @@ class PuffcoClimate(PuffcoEntity, ClimateEntity):
             return
         idx = self._selected_index()
         if idx is None:
-            raise HomeAssistantError(
+            raise ServiceValidationError(
                 "Select a heat profile first; the target temperature edits the "
                 "selected profile."
             )

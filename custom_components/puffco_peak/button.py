@@ -10,47 +10,49 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import PuffcoConfigEntry, PuffcoCoordinator
-from .device import ADD_TEMP_C, ADD_TIME_SEC, PuffcoDevice
+from .device import ADD_TEMP_C, ADD_TIME_SEC
 from .entity import PuffcoEntity
 
 
-def _start_index(coordinator: PuffcoCoordinator) -> int:
-    idx = (coordinator.data or {}).get("selectedHeatCycle")
-    return idx if isinstance(idx, int) and 0 <= idx <= 3 else 0
+async def _start(coordinator: PuffcoCoordinator) -> None:
+    # Check the selection before connecting, so an unknown one is refused
+    # without touching the device.
+    index = coordinator.selected_profile()
+    await coordinator.async_command(lambda d: d.start_heat_cycle(index))
 
 
 @dataclass(frozen=True, kw_only=True)
 class PuffcoButtonDescription(ButtonEntityDescription):
-    """Describes a Puffco button and the command it runs."""
+    """Describes a Puffco button and what pressing it does."""
 
-    press_fn: Callable[[PuffcoCoordinator, PuffcoDevice], Awaitable[None]]
+    press_fn: Callable[[PuffcoCoordinator], Awaitable[None]]
 
 
 BUTTONS: tuple[PuffcoButtonDescription, ...] = (
     PuffcoButtonDescription(
         key="start",
         translation_key="start",
-        press_fn=lambda c, d: d.start_heat_cycle(_start_index(c)),
+        press_fn=_start,
     ),
     PuffcoButtonDescription(
         key="stop",
         translation_key="stop",
-        press_fn=lambda c, d: d.stop_heat_cycle(),
+        press_fn=lambda c: c.async_command(lambda d: d.stop_heat_cycle()),
     ),
     PuffcoButtonDescription(
         key="add_temperature",
         translation_key="add_temperature",
-        press_fn=lambda c, d: d.add_temperature_c(ADD_TEMP_C),
+        press_fn=lambda c: c.async_command(lambda d: d.add_temperature_c(ADD_TEMP_C)),
     ),
     PuffcoButtonDescription(
         key="add_time",
         translation_key="add_time",
-        press_fn=lambda c, d: d.add_time_seconds(ADD_TIME_SEC),
+        press_fn=lambda c: c.async_command(lambda d: d.add_time_seconds(ADD_TIME_SEC)),
     ),
     PuffcoButtonDescription(
         key="power_off",
         translation_key="power_off",
-        press_fn=lambda c, d: d.power_off(),
+        press_fn=lambda c: c.async_command(lambda d: d.power_off()),
     ),
 )
 
@@ -78,6 +80,4 @@ class PuffcoButton(PuffcoEntity, ButtonEntity):
         self._attr_unique_id = f"{coordinator.address}_{description.key}"
 
     async def async_press(self) -> None:
-        await self.coordinator.async_command(
-            lambda d: self.entity_description.press_fn(self.coordinator, d)
-        )
+        await self.entity_description.press_fn(self.coordinator)
