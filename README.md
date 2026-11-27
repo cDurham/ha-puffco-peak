@@ -42,11 +42,25 @@ not supported.
 
 ## Install
 
-### HACS (custom repository)
+### HACS
+
+Puffco Peak is in the HACS default list, so you can find it by searching:
+
+1. In HACS, search for **Puffco Peak** and open it.
+2. Select **Download**.
+3. Restart Home Assistant.
+
+Or open it in your Home Assistant's HACS directly:
+
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=magikh0e&repository=ha-puffco-peak&category=integration)
+
+### HACS custom repository
+
+If the search doesn't find it, add the repository yourself:
 
 1. HACS, three-dot menu, **Custom repositories**.
 2. Add `https://github.com/magikh0e/ha-puffco-peak` as an **Integration**.
-3. Install **Puffco Peak**, then restart Home Assistant.
+3. Download **Puffco Peak**, then restart Home Assistant.
 
 ### Manual
 
