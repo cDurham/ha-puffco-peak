@@ -9,6 +9,10 @@ class UpdateFailed(Exception):
     pass
 
 
+class ServiceValidationError(Exception):
+    pass
+
+
 class DataUpdateCoordinator[T]:
     pass
 
@@ -46,6 +50,7 @@ def stub(name, **attrs):
 stub("homeassistant.components", bluetooth=ModuleType("bluetooth"))
 stub("homeassistant.config_entries", ConfigEntry=object)
 stub("homeassistant.core", HomeAssistant=object, callback=lambda f: f)
+stub("homeassistant.exceptions", ServiceValidationError=ServiceValidationError)
 stub(
     "homeassistant.helpers.update_coordinator",
     DataUpdateCoordinator=DataUpdateCoordinator,
