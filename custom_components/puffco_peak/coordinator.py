@@ -14,6 +14,7 @@ from habluetooth import BaseHaRemoteScanner
 from homeassistant.components import bluetooth
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .agent import pairing_agent
@@ -247,6 +248,22 @@ class PuffcoCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._device is not None:
             await self._load_profiles(self._device)
             self.async_update_listeners()
+
+    def selected_profile(self) -> int:
+        """The heat profile the device has selected, to start a heat cycle with.
+
+        Raises ServiceValidationError when it is unknown: the read failed, or
+        the device reports -1 ("Temp"), which is none of the four profiles.
+        Guessing one would overwrite the user's selection and heat to a
+        profile nobody picked.
+        """
+        idx = (self.data or {}).get("selectedHeatCycle")
+        if isinstance(idx, int) and 0 <= idx < PROFILE_COUNT:
+            return idx
+        raise ServiceValidationError(
+            "Select a heat profile first; the device has none of its four heat "
+            "profiles selected."
+        )
 
     async def async_command(
         self, action: Callable[[PuffcoDevice], Awaitable[None]]
