@@ -1,0 +1,97 @@
+name: Bug report
+description: The Peak connects, but an entity shows the wrong value, a control doesn't work, or something else misbehaves.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If the Peak won't connect or bond at all, use **Connection or bonding problem** instead.
+
+  - type: input
+    id: version
+    attributes:
+      label: Integration version
+      description: The `version` in `custom_components/puffco_peak/manifest.json`, or the release you installed.
+      placeholder: 0.1.7
+    validations:
+      required: true
+
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+      description: Settings, About.
+      placeholder: 2026.11.3
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install_type
+    attributes:
+      label: Installation type
+      options:
+        - Home Assistant OS
+        - Home Assistant Container
+        - Home Assistant Supervised
+        - Home Assistant Core
+    validations:
+      required: true
+
+  - type: input
+    id: firmware
+    attributes:
+      label: Peak firmware
+      description: The firmware shown on the Peak's device page in Home Assistant.
+
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened
+      description: Which entity or control, and what it did.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: What the Peak itself showed, or what the Puffco app shows for the same thing.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen
+      description: The steps, if it happens every time.
+      placeholder: |
+        1. Select heat profile 2.
+        2. Press Start.
+        3. ...
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: |
+        Settings, Devices & services, Puffco Peak, then the ⋮ menu: **Download diagnostics**. Drag the file here. The serial number is already removed. The device name isn't, so edit it out if you'd rather not share it.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Debug log
+      description: |
+        Settings, Devices & services, Puffco Peak, then the ⋮ menu: **Enable debug logging**. Make the problem happen, then choose **Disable debug logging**, which downloads the log. Paste the lines from `custom_components.puffco_peak`.
+
+        The log shows the Peak's Bluetooth address. You can replace it with `AA:BB:CC:DD:EE:FF`.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I'm on the latest release.
+          required: true
+        - label: I searched the existing issues for this.
+          required: true

@@ -1,0 +1,34 @@
+name: Feature request
+description: Something you'd like the integration to show or control.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: want
+    attributes:
+      label: What you want to do
+      description: What you're trying to do from Home Assistant, and what gets in the way today.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: How it could work
+      description: The entity, control or behavior you have in mind, if you have one.
+
+  - type: textarea
+    id: device
+    attributes:
+      label: What the Peak offers for it
+      description: If it needs something from the device, what do you know about it? A setting in the Puffco app, a field name, a LORAX path, or a capture.
+
+  - type: dropdown
+    id: test
+    attributes:
+      label: Can you test it on a Peak?
+      description: Changes are confirmed on a real device before they're released.
+      options:
+        - Yes, I have a Peak Pro and can test a build
+        - No
+    validations:
+      required: true

@@ -1,0 +1,106 @@
+name: Connection or bonding problem
+description: Home Assistant can't find, connect to, or bond with the Peak.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before you file this, check the [setup steps](https://github.com/magikh0e/ha-puffco-peak#set-up):
+
+        - The Peak needs a **local Bluetooth adapter** on the Home Assistant host. Bonding over an ESPHome Bluetooth proxy isn't supported.
+        - The first connect needs the Peak in **pairing mode**: hold the button until the logo glows blue.
+        - Only one connection at a time: close the Puffco app on your phone.
+        - If bonding still fails, [pair it once from the host shell](https://github.com/magikh0e/ha-puffco-peak#if-bonding-does-not-complete).
+
+  - type: input
+    id: version
+    attributes:
+      label: Integration version
+      description: The `version` in `custom_components/puffco_peak/manifest.json`, or the release you installed.
+      placeholder: 0.1.7
+    validations:
+      required: true
+
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+      description: Settings, About.
+      placeholder: 2026.11.3
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install_type
+    attributes:
+      label: Installation type
+      options:
+        - Home Assistant OS
+        - Home Assistant Container
+        - Home Assistant Supervised
+        - Home Assistant Core
+    validations:
+      required: true
+
+  - type: dropdown
+    id: adapter
+    attributes:
+      label: Bluetooth adapter
+      options:
+        - Built into the Home Assistant host
+        - USB dongle on the Home Assistant host
+        - ESPHome Bluetooth proxy only
+        - Something else (say below)
+    validations:
+      required: true
+
+  - type: input
+    id: adapter_model
+    attributes:
+      label: Adapter model
+      description: The host's model (a Raspberry Pi 4, say) or the dongle's, if you know it.
+
+  - type: dropdown
+    id: history
+    attributes:
+      label: Has this Peak worked with this host before?
+      options:
+        - No, this is the first setup
+        - Yes, it worked and then stopped
+        - Not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: tried
+    attributes:
+      label: What you tried
+      options:
+        - label: The Peak was in pairing mode (logo glowing blue) when Home Assistant tried to connect.
+        - label: The Puffco app on my phone was closed.
+        - label: I paired it from the host shell with `bluetoothctl`, as the README describes.
+
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened
+      description: The error Home Assistant showed, and when (while adding the integration, on restart, after it had been working).
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Debug log
+      description: |
+        Settings, Devices & services, Puffco Peak, then the ⋮ menu: **Enable debug logging**. Try to connect again, then choose **Disable debug logging**, which downloads the log. Paste the lines from `custom_components.puffco_peak`, `bleak` and `bluetooth`.
+
+        The log shows the Peak's Bluetooth address. You can replace it with `AA:BB:CC:DD:EE:FF`.
+      render: text
+
+  - type: textarea
+    id: shell_output
+    attributes:
+      label: bluetoothctl output
+      description: If you paired from the host shell, paste what `bluetoothctl` printed. Replace the Bluetooth address here too if you like.
+      render: text
