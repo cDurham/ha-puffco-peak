@@ -9,6 +9,7 @@ added later.
 from __future__ import annotations
 
 import struct
+from collections.abc import Callable
 from typing import Any
 
 from .fields import FIELDS
@@ -122,6 +123,8 @@ class PuffcoDevice:
     def __init__(self, lorax: Any) -> None:
         self._lorax = lorax
         self.fields = FIELDS
+        self._watch_handles: dict[str, int] = {}
+        self._pushed: dict[str, Any] = {}
 
     def has(self, name: str) -> bool:
         return name in self.fields
@@ -147,6 +150,31 @@ class PuffcoDevice:
     async def write(self, name: str, value: Any) -> None:
         field = self._field(name)
         await self._lorax.write_short(field["path"], encode(field, value))
+
+    async def watch(
+        self, name: str, period: int, on_value: Callable[[Any], None]
+    ) -> None:
+        """Have the device push a field now and on every change."""
+        field = self._field(name)
+
+        def on_data(data: bytes) -> None:
+            value = decode(field, data)
+            self._pushed[name] = value
+            on_value(value)
+
+        self._watch_handles[name] = await self._lorax.watch(
+            field["path"], period, on_data
+        )
+
+    def watching(self, name: str) -> bool:
+        handle = self._watch_handles.get(name)
+        return handle is not None and self._lorax.watching(handle)
+
+    def pushed(self) -> dict[str, Any]:
+        """The latest value of every field the device is still pushing."""
+        return {
+            name: value for name, value in self._pushed.items() if self.watching(name)
+        }
 
     def enum_label(self, name: str, value: Any) -> str | None:
         field = self.fields.get(name)

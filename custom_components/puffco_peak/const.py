@@ -18,10 +18,15 @@ SERVICE_UUID: Final = "e276967f-ea8a-478a-a92e-d78f5dd15dd5"
 PUFFCO_COMPANY_ID: Final = 3075
 
 # --- Poll cadence -----------------------------------------------------------
-# The heater reading is only interesting while the device is doing something, so
-# poll fast when it is preheating / active and slowly the rest of the time.
+# Full reads: every POLL_IDLE when idle, every POLL_ACTIVE during a heat cycle.
 POLL_IDLE: Final = timedelta(seconds=30)
 POLL_ACTIVE: Final = timedelta(seconds=3)
+
+PUSHED_FIELD_PERIODS: Final = {
+    "operatingState": 2897,
+    "battChargeState": 4096,
+    "battChargeSource": 4096,
+}
 
 # operatingState values (/p/app/stat/id) that mean a heat cycle is live.
 ACTIVE_STATES: Final = frozenset({7, 8, 9})  # HeatCyclePreheat, HeatCycleActive, HeatCycleFade
