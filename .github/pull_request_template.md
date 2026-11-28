@@ -1,3 +1,6 @@
+<!-- Open pull requests against the `dev` branch, not `main`. If the base menu above says "base: main",
+     pick `dev` there before you create the PR. On a PR that's already open, click Edit next to the title to change it. -->
+
 ## What this changes
 
 <!-- What the PR changes and why. Link the issue it fixes, if there is one. -->
@@ -16,6 +19,7 @@
 
 ## Checklist
 
+- [ ] This PR targets the `dev` branch.
 - [ ] I ran this change on a real Peak in Home Assistant, as described above, or said above which parts I couldn't test.
 - [ ] Any new protocol detail (a path, an opcode, a payload layout) says where it comes from: a capture, the Puffco app, or the protocol notes.
 - [ ] Nothing here (code, logs, screenshots) contains a serial number, Bluetooth address or device name.
