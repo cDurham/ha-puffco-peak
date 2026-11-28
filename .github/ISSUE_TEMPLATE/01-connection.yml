@@ -78,7 +78,7 @@ body:
       options:
         - label: The Peak was in pairing mode (logo glowing blue) when Home Assistant tried to connect.
         - label: The Puffco app on my phone was closed.
-        - label: I paired it from the host shell with `bluetoothctl`, as the README describes.
+        - label: I paired it from the host shell with bluetoothctl, as the README describes.
 
   - type: textarea
     id: what_happened
