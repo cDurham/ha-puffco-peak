@@ -74,7 +74,7 @@ body:
     attributes:
       label: Diagnostics
       description: |
-        Settings, Devices & services, Puffco Peak, then the ⋮ menu: **Download diagnostics**. Drag the file here. The serial number is already removed. The device name isn't, so edit it out if you'd rather not share it.
+        Settings, Devices & services, Puffco Peak, then the ⋮ menu: **Download diagnostics**. Drag the file here. The serial number and device name are removed for you (older versions left the name in, so check before you post).
 
   - type: textarea
     id: logs

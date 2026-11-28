@@ -8,7 +8,9 @@ from homeassistant.core import HomeAssistant
 
 from .coordinator import PuffcoConfigEntry
 
-_REDACT = {"serialNumber", "euid"}
+# The device name carries a per-device number (shown as "Peak Pro" plus digits),
+# so it identifies the Peak as much as the serial does.
+_REDACT = {"serialNumber", "euid", "deviceName"}
 
 
 def _redact(data: dict[str, Any]) -> dict[str, Any]:
